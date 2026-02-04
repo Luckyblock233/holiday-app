@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { api, API_BASE } from "../api";
+import { api, openSecureFile } from "../api";
+import SecureImage from "../components/SecureImage.jsx";
 import { formatChinaDateTime, getLocalDateISO } from "../date";
 
 function getQueryDay() {
@@ -193,21 +194,22 @@ export default function DayCheckin() {
             <div className="mt-2">
               {isImageUpload(u) && (
                 <>
-                  <img
-                    className="thumb"
-                    src={`${API_BASE}${u.url}`}
-                    alt={u.category}
-                  />
+                  <SecureImage className="thumb" src={u.url} alt={u.category} />
                   <div className="h-2" />
                 </>
               )}
-              <a
+              <button
                 className="btn secondary"
-                href={`${API_BASE}${u.url}`}
-                target="_blank"
+                onClick={async () => {
+                  try {
+                    await openSecureFile(u.url);
+                  } catch (e) {
+                    alert(e.message);
+                  }
+                }}
               >
                 打开文件
-              </a>
+              </button>
             </div>
           </div>
         ))}

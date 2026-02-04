@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { api, API_BASE } from "../api";
+import { api, openSecureFile } from "../api";
+import SecureImage from "../components/SecureImage.jsx";
 import { formatChinaDateTime, getLocalDateISO } from "../date";
 
 function todayISO() {
@@ -298,7 +299,6 @@ export default function AdminDashboard() {
             <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(uploadsByCategory[cat] || []).map((u) => {
                 const isImage = isImageUpload(u);
-                const fileUrl = `${API_BASE}${u.url}`;
                 return (
                   <div
                     key={u.id}
@@ -309,17 +309,22 @@ export default function AdminDashboard() {
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       {isImage ? (
-                        <img className="thumb" src={fileUrl} alt={cat} />
+                        <SecureImage className="thumb" src={u.url} alt={cat} />
                       ) : (
                         <div className="muted">非图片文件</div>
                       )}
-                      <a
+                      <button
                         className="btn secondary whitespace-nowrap"
-                        href={fileUrl}
-                        target="_blank"
+                        onClick={async () => {
+                          try {
+                            await openSecureFile(u.url);
+                          } catch (e) {
+                            alert(e.message);
+                          }
+                        }}
                       >
                         打开文件
-                      </a>
+                      </button>
                     </div>
                   </div>
                 );

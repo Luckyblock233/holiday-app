@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import fs from "fs";
+import crypto from "crypto";
 import sharp from "sharp";
 import { db } from "../db.js";
 import { authRequired, requireRole } from "../auth.js";
@@ -16,22 +17,47 @@ function getStudentId() {
   return row?.id || null;
 }
 
-if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
+const UPLOAD_DIR = "./uploads";
+const MAX_UPLOAD_SIZE = Number(process.env.MAX_UPLOAD_SIZE || 10 * 1024 * 1024);
+const MAX_IMAGE_PIXELS = Number(process.env.MAX_IMAGE_PIXELS || 50_000_000);
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+
+function extFromMime(mime) {
+  if (mime === "image/jpeg") return ".jpg";
+  if (mime === "image/png") return ".png";
+  if (mime === "image/webp") return ".webp";
+  return "";
+}
 
 const noteStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "./uploads"),
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^\w.\-]+/g, "_");
-    cb(null, `${Date.now()}_${safe}`);
+    const ext = extFromMime(file.mimetype);
+    const name = `${Date.now()}_${crypto.randomBytes(8).toString("hex")}${ext}`;
+    cb(null, name);
   },
 });
-const noteUpload = multer({ storage: noteStorage });
+const noteUpload = multer({
+  storage: noteStorage,
+  limits: { fileSize: MAX_UPLOAD_SIZE },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      return cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", "file"));
+    }
+    return cb(null, true);
+  },
+});
 
 async function compressImage(filePath, mime) {
   if (!mime || !mime.startsWith("image/")) return;
-  if (mime === "image/gif") return;
 
-  const transformer = sharp(filePath).resize({
+  const transformer = sharp(filePath, {
+    limitInputPixels: MAX_IMAGE_PIXELS,
+  })
+    .rotate()
+    .resize({
     width: 1600,
     withoutEnlargement: true,
   });
@@ -71,7 +97,7 @@ router.get("/:day", authRequired, (req, res) => {
       return {
         ...n,
         kind: "image",
-        url: `/uploads/${payload.filename}`,
+        url: `/api/uploads/file/${payload.filename}`,
         mime: payload.mime || "",
       };
     }
@@ -134,19 +160,16 @@ router.post("/:day/notes", authRequired, noteUpload.single("file"), async (req, 
   const uid = req.user.uid;
   const file = req.file;
   if (!file) return res.status(400).json({ error: "No file" });
-  if (!file.mimetype || !file.mimetype.startsWith("image/")) {
+
+  try {
+    await compressImage(file.path, file.mimetype);
+  } catch (e) {
     try {
       fs.unlinkSync(file.path);
     } catch {
       // ignore
     }
-    return res.status(400).json({ error: "Only image allowed" });
-  }
-
-  try {
-    await compressImage(file.path, file.mimetype);
-  } catch (e) {
-    console.error("compressImage failed:", e);
+    return res.status(400).json({ error: "Invalid image" });
   }
 
   const payload = JSON.stringify({
@@ -160,6 +183,16 @@ router.post("/:day/notes", authRequired, noteUpload.single("file"), async (req, 
     "INSERT INTO reading_notes(user_id, day, content) VALUES(?,?,?)"
   ).run(uid, day, payload);
   res.json({ ok: true });
+});
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ error: "File too large" });
+    }
+    return res.status(400).json({ error: "Only jpeg/png/webp allowed" });
+  }
+  return next(err);
 });
 
 router.delete("/notes/:id", authRequired, (req, res) => {

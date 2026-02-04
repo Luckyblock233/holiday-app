@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { api, API_BASE } from "../api";
+import { api, openSecureFile } from "../api";
+import SecureImage from "../components/SecureImage.jsx";
 import { formatChinaDateTime, getLocalDateISO } from "../date";
 
 function getQueryDay() {
@@ -72,7 +73,7 @@ export default function Notes() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {notes.map((n) => {
             const isImage = n.kind === "image" && n.url;
-            const fileUrl = isImage ? `${API_BASE}${n.url}` : null;
+            const fileUrl = isImage ? n.url : null;
             return (
               <div
                 key={n.id}
@@ -84,16 +85,21 @@ export default function Notes() {
                 {isImage ? (
                   <>
                     <div className="mt-2">
-                      <img className="thumb" src={fileUrl} alt="读书笔记" />
+                      <SecureImage className="thumb" src={fileUrl} alt="读书笔记" />
                     </div>
                     <div className="mt-2 flex gap-2">
-                      <a
+                      <button
                         className="btn secondary w-full justify-center"
-                        href={fileUrl}
-                        target="_blank"
+                        onClick={async () => {
+                          try {
+                            await openSecureFile(fileUrl);
+                          } catch (e) {
+                            alert(e.message);
+                          }
+                        }}
                       >
                         打开大图
-                      </a>
+                      </button>
                     </div>
                   </>
                 ) : (

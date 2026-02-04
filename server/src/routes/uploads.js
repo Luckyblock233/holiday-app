@@ -1,28 +1,55 @@
 import express from "express";
 import multer from "multer";
 import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 import sharp from "sharp";
 import { db } from "../db.js";
 import { authRequired } from "../auth.js";
 
 const router = express.Router();
 
-if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
+const UPLOAD_DIR = "./uploads";
+const MAX_UPLOAD_SIZE = Number(process.env.MAX_UPLOAD_SIZE || 10 * 1024 * 1024);
+const MAX_IMAGE_PIXELS = Number(process.env.MAX_IMAGE_PIXELS || 50_000_000);
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+
+function extFromMime(mime) {
+  if (mime === "image/jpeg") return ".jpg";
+  if (mime === "image/png") return ".png";
+  if (mime === "image/webp") return ".webp";
+  return "";
+}
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "./uploads"),
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^\w.\-]+/g, "_");
-    cb(null, `${Date.now()}_${safe}`);
+    const ext = extFromMime(file.mimetype);
+    const name = `${Date.now()}_${crypto.randomBytes(8).toString("hex")}${ext}`;
+    cb(null, name);
   },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_UPLOAD_SIZE },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      return cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", "file"));
+    }
+    return cb(null, true);
+  },
+});
 
 async function compressImage(filePath, mime) {
   if (!mime || !mime.startsWith("image/")) return;
-  if (mime === "image/gif") return;
 
-  const transformer = sharp(filePath).resize({
+  const transformer = sharp(filePath, {
+    limitInputPixels: MAX_IMAGE_PIXELS,
+  })
+    .rotate()
+    .resize({
     width: 1600,
     withoutEnlargement: true,
   });
@@ -47,7 +74,12 @@ router.post("/:day", authRequired, upload.single("file"), async (req, res) => {
   try {
     await compressImage(req.file.path, req.file.mimetype);
   } catch (e) {
-    console.error("compressImage failed:", e);
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch {
+      // ignore
+    }
+    return res.status(400).json({ error: "Invalid image" });
   }
 
   const finalSize = fs.existsSync(req.file.path)
@@ -68,7 +100,50 @@ router.post("/:day", authRequired, upload.single("file"), async (req, res) => {
     finalSize
   );
 
-  res.json({ ok: true, fileUrl: `/uploads/${req.file.filename}` });
+  res.json({ ok: true, fileUrl: `/api/uploads/file/${req.file.filename}` });
+});
+
+router.get("/file/:filename", authRequired, (req, res) => {
+  const { filename } = req.params;
+  if (!filename || filename !== path.basename(filename)) {
+    return res.status(404).end();
+  }
+
+  let mime = null;
+  const uploadRow = db
+    .prepare("SELECT user_id, mime FROM uploads WHERE filename=?")
+    .get(filename);
+  if (uploadRow) {
+    if (req.user.role !== "admin" && uploadRow.user_id !== req.user.uid) {
+      return res.status(404).end();
+    }
+    mime = uploadRow.mime || null;
+  } else {
+    const noteRows =
+      req.user.role === "admin"
+        ? db.prepare("SELECT content FROM reading_notes").all()
+        : db
+            .prepare("SELECT content FROM reading_notes WHERE user_id=?")
+            .all(req.user.uid);
+    for (const r of noteRows) {
+      try {
+        const payload = JSON.parse(r.content);
+        if (payload?.type === "image" && payload.filename === filename) {
+          mime = payload.mime || null;
+          break;
+        }
+      } catch {
+        // ignore invalid rows
+      }
+    }
+    if (!mime) return res.status(404).end();
+  }
+
+  const filePath = path.join(UPLOAD_DIR, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).end();
+  if (mime) res.setHeader("Content-Type", mime);
+  res.setHeader("Cache-Control", "private, max-age=0, no-store");
+  res.sendFile(path.resolve(filePath));
 });
 
 router.get("/:day", authRequired, (req, res) => {
@@ -86,11 +161,24 @@ router.get("/:day", authRequired, (req, res) => {
     )
     .all(uid, day, pageSize, offset);
   res.json({
-    uploads: rows.map((r) => ({ ...r, url: `/uploads/${r.filename}` })),
+    uploads: rows.map((r) => ({
+      ...r,
+      url: `/api/uploads/file/${r.filename}`,
+    })),
     total,
     page,
     pageSize,
   });
+});
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ error: "File too large" });
+    }
+    return res.status(400).json({ error: "Only jpeg/png/webp allowed" });
+  }
+  return next(err);
 });
 
 export default router;

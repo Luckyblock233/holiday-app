@@ -18,6 +18,24 @@ export function getToken() {
   return localStorage.getItem("token") || "";
 }
 
+export async function fetchWithAuth(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  return res;
+}
+
+export async function openSecureFile(path) {
+  if (!path) return;
+  const res = await fetchWithAuth(path);
+  if (!res.ok) throw new Error("Request failed");
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
 async function request(path, { method = "GET", body, isForm = false } = {}) {
   const headers = {};
   const token = getToken();

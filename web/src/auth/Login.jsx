@@ -3,7 +3,6 @@ import { api, setToken } from "../api";
 
 export default function Login({ onLogin }) {
   const [username, setU] = useState("student");
-  const [password, setP] = useState("student123");
   const [err, setErr] = useState("");
 
   async function submit(e) {

@@ -75,7 +75,7 @@ router.get("/uploads/:day", authRequired, requireRole("admin"), (req, res) => {
       filename: r.filename,
       mime: r.mime || "",
       created_at: r.created_at,
-      url: `/uploads/${r.filename}`,
+      url: `/api/uploads/file/${r.filename}`,
     });
   }
 
@@ -93,7 +93,7 @@ router.get("/uploads/:day", authRequired, requireRole("admin"), (req, res) => {
         filename: payload.filename,
         mime: payload.mime || "",
         created_at: n.created_at,
-        url: `/uploads/${payload.filename}`,
+        url: `/api/uploads/file/${payload.filename}`,
       });
     }
   }
