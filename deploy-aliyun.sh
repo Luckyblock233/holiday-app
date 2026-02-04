@@ -71,9 +71,9 @@ install_deps() {
 }
 
 build_web() {
-  log "写入 web/.env.production（VITE_API_BASE=/）..."
+  log "写入 web/.env.production（VITE_API_BASE=，使用同域）..."
   cat > "$WEB_DIR/.env.production" <<EOF
-VITE_API_BASE=/
+VITE_API_BASE=
 EOF
 
   log "构建前端..."

@@ -1,5 +1,12 @@
-export const API_BASE =
-  import.meta.env.VITE_API_BASE || "http://localhost:3001";
+function normalizeBase(base) {
+  if (!base || base === "/") return "";
+  if (base.endsWith("/")) return base.slice(0, -1);
+  return base;
+}
+
+export const API_BASE = normalizeBase(
+  import.meta.env.VITE_API_BASE || "http://localhost:3001"
+);
 
 export function setToken(t) {
   localStorage.setItem("token", t || "");
