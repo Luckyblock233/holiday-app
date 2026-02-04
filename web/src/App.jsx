@@ -41,13 +41,17 @@ export default function App() {
   };
 
   return (
-    <div>
-      <div className="container">
-        <div
-          className="row"
-          style={{ justifyContent: "space-between", alignItems: "center" }}
-        >
-          <div className="badge">登录身份：{me.role}</div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/80 backdrop-blur">
+        <div className="container flex items-center justify-between py-4">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">
+              假期打卡系统
+            </div>
+            <div className="text-sm font-semibold text-slate-900">
+              当前身份：{me.role}
+            </div>
+          </div>
           <button className="btn secondary" onClick={logout}>
             退出
           </button>
@@ -56,7 +60,8 @@ export default function App() {
 
       {route === "checkin" && <DayCheckin />}
       {route === "notes" && <Notes />}
-      {route === "redeem" && <Redeem />}
+      {route === "redeem" &&
+        (me.role === "admin" ? <Redeem /> : <StudentDashboard />)}
       {route === "home" &&
         (me.role === "admin" ? <AdminDashboard /> : <StudentDashboard />)}
     </div>

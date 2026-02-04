@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import { getLocalDateISO } from "../date";
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateISO();
 }
 
 export default function StudentDashboard() {
@@ -48,13 +49,21 @@ export default function StudentDashboard() {
       },
     ];
   }, [data]);
+  const completion = statusPills.length
+    ? Math.round(
+        (statusPills.filter((p) => p.ok).length / statusPills.length) * 100
+      )
+    : 0;
 
   return (
-    <div className="container">
+    <div className="container py-6">
       <div className="card">
-        <div className="h1">学生端</div>
-        <div className="row">
-          <div className="col">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="h1">学生端</div>
+            <div className="muted">查看当日状态并完成打卡</div>
+          </div>
+          <div className="min-w-[200px]">
             <label>选择日期</label>
             <input
               className="input"
@@ -62,19 +71,28 @@ export default function StudentDashboard() {
               value={day}
               onChange={(e) => setDay(e.target.value)}
             />
-            {data?.yesterdayScreenViolated && (
-              <div style={{ marginTop: 8 }} className="badge warn">
-                昨天屏幕超时：今天基础奖励将减少 10 分钟（若达标）
-              </div>
-            )}
           </div>
-          <div className="col">
-            <div className="badge good">游戏时间余额：{balance} 分钟</div>
-            <div style={{ height: 8 }} />
-            <div className={"badge " + (earned > 0 ? "good" : "warn")}>
-              今日可得：{earned} 分钟
+        </div>
+
+        {data?.yesterdayScreenViolated && (
+          <div className="mt-3 badge warn">
+            昨天屏幕超时：今天基础奖励将减少 10 分钟（若达标）
+          </div>
+        )}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-slate-200/70 bg-slate-50 p-3">
+            <div className="muted">游戏时间余额</div>
+            <div className="mt-1 text-2xl font-semibold text-slate-900">
+              {balance} 分钟
             </div>
-            <div className="muted" style={{ marginTop: 6 }}>
+          </div>
+          <div className="rounded-xl border border-slate-200/70 bg-slate-50 p-3">
+            <div className="muted">今日可得</div>
+            <div className="mt-1 text-2xl font-semibold text-slate-900">
+              {earned} 分钟
+            </div>
+            <div className="muted mt-1">
               基础 {breakdown.base || 0} / 阅读奖励{" "}
               {breakdown.bonusReading || 0} / 运动奖励{" "}
               {breakdown.bonusExercise || 0}
@@ -83,13 +101,25 @@ export default function StudentDashboard() {
         </div>
 
         {err && (
-          <div style={{ marginTop: 10 }} className="badge danger">
+          <div className="mt-3 badge danger">
             {err}
           </div>
         )}
 
         <hr />
-        <div className="row">
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-sm text-slate-700">
+            <div>打卡完成度</div>
+            <div className="font-semibold text-slate-900">{completion}%</div>
+          </div>
+          <div className="mt-2 h-2 w-full rounded-full bg-slate-200">
+            <div
+              className="h-2 rounded-full bg-emerald-500 transition-all"
+              style={{ width: `${completion}%` }}
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
           {statusPills.map((p, idx) => (
             <div key={idx} className={"badge " + (p.ok ? "good" : "danger")}>
               {p.label}
@@ -97,34 +127,30 @@ export default function StudentDashboard() {
           ))}
         </div>
 
-        <div style={{ height: 12 }} />
-        <div className="row">
-          <a className="btn secondary" href={`#/checkin?day=${day}`}>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <a className="btn secondary w-full justify-center" href={`#/checkin?day=${day}`}>
             去打卡
           </a>
-          <a className="btn secondary" href={`#/notes?day=${day}`}>
+          <a className="btn secondary w-full justify-center" href={`#/notes?day=${day}`}>
             写读书笔记
           </a>
-          <a className="btn secondary" href={`#/redeem`}>
-            兑现游戏时间
-          </a>
-          <button
-            className="btn"
-            onClick={async () => {
-              try {
-                await api.settle(day);
-                await load();
-              } catch (e) {
-                alert(e.message);
-              }
-            }}
-          >
-            结算今日奖励
-          </button>
         </div>
 
-        <div className="muted" style={{ marginTop: 10 }}>
-          提示：为了避免重复计算，建议每天晚上由家长或学生点击“结算今日奖励”一次。
+        <div className="muted mt-4">
+          提示：结算今日奖励与兑现游戏时间已转移到家长端操作。
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="h1">规则说明</div>
+        <div className="muted">参考 README 的运行流程建议</div>
+        <div className="mt-2 space-y-1 text-sm text-slate-700">
+          <div>1. 学生：打卡 + 写笔记 +（可选）上传佐证</div>
+          <div>2. 晚上由家长点击一次“结算今日奖励”</div>
+          <div>3. 家长：查看记录并勾选“家长检查”决定是否发放超额奖励</div>
+        </div>
+        <div className="muted mt-2">
+          当前逻辑：基础奖励不要求家长检查；超额奖励需要家长检查
         </div>
       </div>
     </div>

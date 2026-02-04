@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3001";
+export const API_BASE =
+  import.meta.env.VITE_API_BASE || "http://localhost:3001";
 
 export function setToken(t) {
   localStorage.setItem("token", t || "");
@@ -47,13 +48,18 @@ export const api = {
   getDay: (day) => request(`/api/days/${day}`),
   saveDay: (day, payload) =>
     request(`/api/days/${day}`, { method: "PUT", body: payload }),
-  addNote: (day, content) =>
-    request(`/api/days/${day}/notes`, { method: "POST", body: { content } }),
+  addNote: (day, formData) =>
+    request(`/api/days/${day}/notes`, {
+      method: "POST",
+      body: formData,
+      isForm: true,
+    }),
   delNote: (id) => request(`/api/days/notes/${id}`, { method: "DELETE" }),
   settle: (day) => request(`/api/days/${day}/settle`, { method: "POST" }),
   myBalance: () => request(`/api/days/balance/me`),
 
-  listUploads: (day) => request(`/api/uploads/${day}`),
+  listUploads: (day, { page = 1, pageSize = 8 } = {}) =>
+    request(`/api/uploads/${day}?page=${page}&pageSize=${pageSize}`),
   upload: (day, formData) =>
     request(`/api/uploads/${day}`, {
       method: "POST",
@@ -70,5 +76,12 @@ export const api = {
     request(`/api/admin/days/${day}/check`, {
       method: "POST",
       body: { checked },
+    }),
+  adminUploads: (day, { page = 1, pageSize = 9 } = {}) =>
+    request(`/api/admin/uploads/${day}?page=${page}&pageSize=${pageSize}`),
+  adminAdjust: (minutes, note, day) =>
+    request(`/api/admin/ledger/adjust`, {
+      method: "POST",
+      body: { minutes, note, day },
     }),
 };

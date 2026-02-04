@@ -1,94 +1,68 @@
-:root {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC",
-    "Microsoft YaHei", sans-serif;
-}
-body {
-  margin: 0;
-  background: #f6f7fb;
-  color: #111;
-}
-a {
-  color: inherit;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto,
+      "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+  a {
+    @apply text-slate-900;
+  }
+  label {
+    @apply text-xs font-medium text-slate-600;
+  }
+  hr {
+    @apply my-4 border-slate-200;
+  }
 }
 
-.container {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 16px;
-}
-.card {
-  background: white;
-  border-radius: 14px;
-  padding: 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-  margin-bottom: 12px;
-}
-.row {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.col {
-  flex: 1;
-  min-width: 240px;
-}
-.h1 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 10px;
-}
-.muted {
-  color: #666;
-  font-size: 12px;
-}
-
-.btn {
-  border: 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #111;
-  color: #fff;
-  cursor: pointer;
-}
-.btn.secondary {
-  background: #e9eaef;
-  color: #111;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.input,
-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #e2e4ea;
-  outline: none;
-}
-label {
-  font-size: 12px;
-  color: #444;
-}
-.badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #f0f1f6;
-  font-size: 12px;
-}
-.good {
-  background: #e8fff1;
-}
-.warn {
-  background: #fff4e5;
-}
-.danger {
-  background: #ffe8ea;
-}
-hr {
-  border: 0;
-  border-top: 1px solid #eee;
-  margin: 12px 0;
+@layer components {
+  .container {
+    @apply mx-auto w-full max-w-5xl px-4 sm:px-6;
+  }
+  .card {
+    @apply mb-4 rounded-2xl bg-white p-4 sm:p-6 shadow-soft ring-1 ring-slate-200/70;
+  }
+  .row {
+    @apply flex flex-wrap gap-3;
+  }
+  .col {
+    @apply min-w-[240px] flex-1;
+  }
+  .h1 {
+    @apply text-lg font-semibold text-slate-900;
+  }
+  .muted {
+    @apply text-xs text-slate-500;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn.secondary {
+    @apply bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50;
+  }
+  .input,
+  textarea {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700;
+  }
+  .good {
+    @apply bg-emerald-50 text-emerald-700;
+  }
+  .warn {
+    @apply bg-amber-50 text-amber-700;
+  }
+  .danger {
+    @apply bg-rose-50 text-rose-700;
+  }
+  .thumb {
+    @apply h-24 w-24 rounded-xl object-cover ring-1 ring-slate-200;
+  }
 }

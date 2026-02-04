@@ -1,5 +1,8 @@
 import express from "express";
 import cors from "cors";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { initDb } from "./db.js";
 
 import authRoutes from "./routes/auth.js";
@@ -24,5 +27,15 @@ app.use("/api/admin", adminRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const webDist = path.resolve(__dirname, "../../web/dist");
+if (fs.existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(webDist, "index.html"));
+  });
+}
+
 const port = process.env.PORT || 3001;
-app.listen(port, () => console.log("Server on", port));
+const host = process.env.HOST || "0.0.0.0";
+app.listen(port, host, () => console.log("Server on", host, port));

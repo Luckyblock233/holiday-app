@@ -213,6 +213,9 @@ print_next_steps() {
 - 家长端：${ADMIN_USER} / ${ADMIN_PWD}
 - 学生端：${STUDENT_USER} / ${STUDENT_PWD}
 
+生产部署（云服务器）可使用：
+./deploy.sh
+
 如果 seed 没成功（比如你没启动后端），手动执行：
 curl -X POST ${API_BASE}/api/auth/seed \\
   -H "Content-Type: application/json" \\

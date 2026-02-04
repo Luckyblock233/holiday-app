@@ -1,0 +1,20 @@
+[Unit]
+Description=Holiday App (Node.js + SQLite)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/luckyblock/Desktop/holiday-app/server
+ExecStart=/usr/bin/node /home/luckyblock/Desktop/holiday-app/server/src/index.js
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=3001
+Restart=always
+RestartSec=3
+
+# Logs
+StandardOutput=append:/var/log/holiday-app.log
+StandardError=append:/var/log/holiday-app.err.log
+
+[Install]
+WantedBy=multi-user.target

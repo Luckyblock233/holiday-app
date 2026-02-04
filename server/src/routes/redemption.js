@@ -1,11 +1,20 @@
 import express from "express";
 import { db } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authRequired, requireRole } from "../auth.js";
+import { getChinaDateISO } from "../time.js";
 
 const router = express.Router();
 
-router.post("/", authRequired, (req, res) => {
-  const uid = req.user.uid;
+function getStudentId() {
+  const row = db
+    .prepare("SELECT id FROM users WHERE role='student' LIMIT 1")
+    .get();
+  return row?.id || null;
+}
+
+router.post("/", authRequired, requireRole("admin"), (req, res) => {
+  const uid = getStudentId();
+  if (!uid) return res.status(400).json({ error: "No student" });
   const minutes = Number(req.body?.minutes || 0);
   if (!Number.isFinite(minutes) || minutes <= 0)
     return res.status(400).json({ error: "Invalid minutes" });
@@ -24,7 +33,7 @@ router.post("/", authRequired, (req, res) => {
     "INSERT INTO game_ledger(user_id, day, delta_minutes, reason, note) VALUES(?,?,?,?,?)"
   ).run(
     uid,
-    new Date().toISOString().slice(0, 10),
+    getChinaDateISO(),
     -minutes,
     "redeem",
     req.body?.note || ""
@@ -33,8 +42,9 @@ router.post("/", authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
-router.get("/history/me", authRequired, (req, res) => {
-  const uid = req.user.uid;
+router.get("/history/me", authRequired, requireRole("admin"), (req, res) => {
+  const uid = getStudentId();
+  if (!uid) return res.status(400).json({ error: "No student" });
   const rows = db
     .prepare(
       "SELECT * FROM game_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 200"
