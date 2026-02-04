@@ -98,7 +98,31 @@ export default function AdminDashboard() {
         {err && <div className="mt-3 badge danger">{err}</div>}
 
         <div className="mt-4">
-          {!r && <div className="muted">当天还没有学生打卡记录</div>}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <a className="btn secondary w-full justify-center" href="#/redeem">
+              兑现游戏时间
+            </a>
+            <button
+              className="btn w-full"
+              disabled={!r || busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await api.settle(day);
+                  await load();
+                  alert("已结算");
+                } catch (e) {
+                  alert(e.message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              结算今日奖励
+            </button>
+          </div>
+
+          {!r && <div className="muted mt-3">当天还没有学生打卡记录</div>}
 
           {r && (
             <>
@@ -181,29 +205,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <a className="btn secondary w-full justify-center" href="#/redeem">
-                  兑现游戏时间
-                </a>
-                <button
-                  className="btn w-full"
-                  disabled={!r || busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      await api.settle(day);
-                      await load();
-                      alert("已结算");
-                    } catch (e) {
-                      alert(e.message);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  结算今日奖励
-                </button>
-              </div>
+              <div className="mt-4" />
             </>
           )}
         </div>
