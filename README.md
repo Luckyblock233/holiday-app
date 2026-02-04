@@ -190,18 +190,3 @@ npm i
 
 - 后端是否有静态目录：`/uploads`
 - 打开链接是否是 `http://localhost:3001/uploads/...`
-
----
-
-## 5)（可选）生产部署建议
-
-推荐：
-
-- 前端 build 为静态文件（`npm run build`）
-- Nginx 托管 dist，反代 `/api` 与 `/uploads` 到 Node
-- systemd 守护 Node 进程
-
-- 脚本会安装编译依赖并尝试 seed，但**不会长期帮你保持服务运行**（开发模式推荐你自己开两个终端跑 server/web）。
-- 如果你想要“真正的一键启动”也可以：我可以再给一个 `run-dev.sh` 同时启动前后端并在退出时自动清理进程。
-
-如果你希望我把 README 再加上 **生产部署（Nginx + systemd + https）完整模板**，我也可以直接给你可复制粘贴的配置文件。
