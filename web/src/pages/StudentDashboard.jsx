@@ -135,15 +135,10 @@ export default function StudentDashboard() {
             写读书笔记
           </a>
         </div>
-
-        <div className="muted mt-4">
-          提示：结算今日奖励与兑现游戏时间已转移到家长端操作。
-        </div>
       </div>
 
       <div className="card">
         <div className="h1">规则说明</div>
-        <div className="muted">参考 README 的运行流程建议</div>
         <div className="mt-2 space-y-1 text-sm text-slate-700">
           <div>1. 学生：打卡 + 写笔记 +（可选）上传佐证</div>
           <div>2. 晚上由家长点击一次“结算今日奖励”</div>
