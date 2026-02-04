@@ -7,6 +7,9 @@ WEB_DIR="$PROJECT_DIR/web"
 
 API_PORT="${API_PORT:-3001}"
 HOST="${HOST:-0.0.0.0}"
+USE_CN_MIRROR="${USE_CN_MIRROR:-1}"
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
+SHARP_DIST_BASE_URL="${SHARP_DIST_BASE_URL:-https://npmmirror.com/mirrors/sharp}"
 
 PID_FILE="$PROJECT_DIR/.server.pid"
 LOG_FILE="$PROJECT_DIR/.server.log"
@@ -55,8 +58,13 @@ install_node_20_if_missing() {
 }
 
 install_deps() {
+  if [[ "$USE_CN_MIRROR" == "1" ]]; then
+    log "使用国内镜像加速 npm（${NPM_REGISTRY}）..."
+    npm config set registry "$NPM_REGISTRY"
+  fi
+
   log "安装后端依赖（production）..."
-  (cd "$SERVER_DIR" && npm install --omit=dev)
+  (cd "$SERVER_DIR" && SHARP_DIST_BASE_URL="$SHARP_DIST_BASE_URL" npm install --omit=dev)
 
   log "安装前端依赖..."
   (cd "$WEB_DIR" && npm install --no-audit --no-fund --loglevel=info)
@@ -120,6 +128,11 @@ usage() {
   ./deploy-aliyun.sh [build|start|systemd|nginx|all]
 
 默认行为：all（安装依赖 + 构建 + 启动 + systemd + nginx）
+
+可选环境变量：
+- USE_CN_MIRROR=1           启用国内 npm 镜像（默认启用）
+- NPM_REGISTRY=...          自定义 npm 镜像地址
+- SHARP_DIST_BASE_URL=...   sharp 预编译包镜像
 EOF
 }
 
