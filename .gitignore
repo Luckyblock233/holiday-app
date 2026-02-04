@@ -26,6 +26,7 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+.env.*
 
 ####################################
 # Vite / 前端构建
@@ -33,6 +34,7 @@ pnpm-debug.log*
 web/dist/
 web/.vite/
 web/node_modules/
+web/.env.production
 
 ####################################
 # 后端
@@ -56,6 +58,12 @@ server/uploads/**
 ####################################
 .server.log
 .server.pid
+
+####################################
+# Nginx / 部署本地配置
+####################################
+nginx/*.local.conf
+nginx/*-real.conf
 
 ####################################
 # IDE / 编辑器
