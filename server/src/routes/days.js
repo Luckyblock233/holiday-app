@@ -202,18 +202,11 @@ router.delete("/notes/:id", authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
-// 结算：把当天 earned 记入 ledger（避免重复结算：同一天已 earned 就不再插入）
+// 结算：把当天 earned 记入 ledger
 router.post("/:day/settle", authRequired, requireRole("admin"), (req, res) => {
   const { day } = req.params;
   const uid = getStudentId();
   if (!uid) return res.status(400).json({ error: "No student" });
-
-  const already = db
-    .prepare(
-      "SELECT 1 FROM game_ledger WHERE user_id=? AND day=? AND reason='earned'"
-    )
-    .get(uid, day);
-  if (already) return res.status(400).json({ error: "Already settled" });
 
   const record = db
     .prepare("SELECT * FROM day_records WHERE user_id=? AND day=?")
@@ -237,6 +230,31 @@ router.post("/:day/settle", authRequired, requireRole("admin"), (req, res) => {
     isParentChecked,
     yesterdayScreenViolated: yViolated,
   });
+
+  const existing = db
+    .prepare(
+      "SELECT id, delta_minutes FROM game_ledger WHERE user_id=? AND day=? AND reason='earned'"
+    )
+    .get(uid, day);
+  if (existing) {
+    if (existing.delta_minutes !== calc.earned) {
+      db.prepare(
+        "UPDATE game_ledger SET delta_minutes=?, note=? WHERE id=?"
+      ).run(calc.earned, JSON.stringify(calc.breakdown), existing.id);
+      return res.json({
+        ok: true,
+        earned: calc.earned,
+        breakdown: calc.breakdown,
+        updated: true,
+      });
+    }
+    return res.json({
+      ok: true,
+      earned: calc.earned,
+      breakdown: calc.breakdown,
+      updated: false,
+    });
+  }
 
   db.prepare(
     "INSERT INTO game_ledger(user_id, day, delta_minutes, reason, note) VALUES(?,?,?,?,?)"

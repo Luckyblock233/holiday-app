@@ -148,7 +148,7 @@ export default function DayCheckin() {
             <div className="text-sm font-semibold text-slate-900">
               上传佐证材料
             </div>
-            <div className="muted">可上传图片/视频；类别用于家长查看更清晰</div>
+            <div className="muted">可上传图片；类别用于家长查看更清晰</div>
 
             <div className="mt-3 space-y-3">
               {[
