@@ -4,9 +4,12 @@ function normalizeBase(base) {
   return base;
 }
 
-export const API_BASE = normalizeBase(
-  import.meta.env.VITE_API_BASE || "http://localhost:3001"
-);
+const rawBase = import.meta.env.VITE_API_BASE || "http://localhost:3001";
+const isProd = import.meta.env.PROD;
+const shouldIgnoreLocalhost =
+  isProd && /^(http:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/.test(rawBase);
+
+export const API_BASE = normalizeBase(shouldIgnoreLocalhost ? "" : rawBase);
 
 export function setToken(t) {
   localStorage.setItem("token", t || "");
