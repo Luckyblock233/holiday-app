@@ -10,6 +10,7 @@ HOST="${HOST:-0.0.0.0}"
 USE_CN_MIRROR="${USE_CN_MIRROR:-1}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
 SHARP_DIST_BASE_URL="${SHARP_DIST_BASE_URL:-https://npmmirror.com/mirrors/sharp}"
+PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"
 
 PID_FILE="$PROJECT_DIR/.server.pid"
 LOG_FILE="$PROJECT_DIR/.server.log"
@@ -40,10 +41,19 @@ check_layout() {
   fi
 }
 
+detect_node() {
+  NODE_BIN="$(command -v node)"
+  NPM_BIN="$(command -v npm)"
+  if [[ -z "${NODE_BIN:-}" || -z "${NPM_BIN:-}" ]]; then
+    err "未检测到 node/npm，请先安装 Node.js。"
+    exit 1
+  fi
+}
+
 install_system_deps() {
   log "安装系统依赖（Alibaba Cloud Linux 3 / dnf）..."
   sudo dnf -y install git curl ca-certificates nginx \
-    gcc gcc-c++ make python3 openssl-devel
+    gcc gcc-c++ make python3 openssl-devel sqlite sqlite-devel
 }
 
 install_node_20_if_missing() {
@@ -60,14 +70,28 @@ install_node_20_if_missing() {
 install_deps() {
   if [[ "$USE_CN_MIRROR" == "1" ]]; then
     log "使用国内镜像加速 npm（${NPM_REGISTRY}）..."
-    npm config set registry "$NPM_REGISTRY"
+    "$NPM_BIN" config set registry "$NPM_REGISTRY"
   fi
 
   log "安装后端依赖（production）..."
-  (cd "$SERVER_DIR" && SHARP_DIST_BASE_URL="$SHARP_DIST_BASE_URL" npm install --omit=dev)
+  (cd "$SERVER_DIR" && SHARP_DIST_BASE_URL="$SHARP_DIST_BASE_URL" "$NPM_BIN" install --omit=dev)
 
   log "安装前端依赖..."
-  (cd "$WEB_DIR" && npm install --no-audit --no-fund --loglevel=info)
+  (cd "$WEB_DIR" && "$NPM_BIN" install --no-audit --no-fund --loglevel=info)
+}
+
+ensure_better_sqlite3() {
+  local binding
+  binding="$(find "$SERVER_DIR/node_modules/better-sqlite3" -name "better_sqlite3.node" 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$binding" ]]; then
+    return 0
+  fi
+  log "检测到 better-sqlite3 未编译，尝试从源码构建..."
+  (cd "$SERVER_DIR" && env npm_config_python="$PYTHON_BIN" "$NPM_BIN" rebuild better-sqlite3 --build-from-source --verbose)
+  binding="$(find "$SERVER_DIR/node_modules/better-sqlite3" -name "better_sqlite3.node" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$binding" ]]; then
+    warn "better-sqlite3 仍未生成本地绑定，请检查编译日志或系统依赖。"
+  fi
 }
 
 build_web() {
@@ -77,7 +101,7 @@ VITE_API_BASE=.
 EOF
 
   log "构建前端..."
-  (cd "$WEB_DIR" && npm run build)
+  (cd "$WEB_DIR" && "$NPM_BIN" run build)
 }
 
 start_server_bg() {
@@ -91,7 +115,7 @@ start_server_bg() {
   fi
 
   log "启动后端（HOST=$HOST PORT=$API_PORT）..."
-  (cd "$SERVER_DIR" && nohup env HOST="$HOST" PORT="$API_PORT" node src/index.js > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE")
+  (cd "$SERVER_DIR" && nohup env HOST="$HOST" PORT="$API_PORT" "$NODE_BIN" src/index.js > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE")
   sleep 1
   log "后端已尝试启动。日志：$LOG_FILE"
 }
@@ -103,7 +127,14 @@ install_systemd_service() {
   fi
 
   log "安装 systemd 服务..."
-  sudo cp "$SYSTEMD_SERVICE_SRC" "$SYSTEMD_SERVICE_DST"
+  local tmp_service
+  tmp_service="$(mktemp)"
+  sed \
+    -e "s|^WorkingDirectory=.*|WorkingDirectory=$SERVER_DIR|" \
+    -e "s|^ExecStart=.*|ExecStart=$NODE_BIN $SERVER_DIR/src/index.js|" \
+    "$SYSTEMD_SERVICE_SRC" > "$tmp_service"
+  sudo cp "$tmp_service" "$SYSTEMD_SERVICE_DST"
+  rm -f "$tmp_service"
   sudo systemctl daemon-reload
   sudo systemctl enable --now holiday-app
   sudo systemctl status holiday-app --no-pager || true
@@ -133,6 +164,7 @@ usage() {
 - USE_CN_MIRROR=1           启用国内 npm 镜像（默认启用）
 - NPM_REGISTRY=...          自定义 npm 镜像地址
 - SHARP_DIST_BASE_URL=...   sharp 预编译包镜像
+- PYTHON_BIN=...            node-gyp 使用的 python（默认 /usr/bin/python3）
 EOF
 }
 
@@ -146,15 +178,17 @@ main() {
     build)
       install_system_deps
       install_node_20_if_missing
-      need_cmd node
-      need_cmd npm
+      detect_node
       install_deps
+      ensure_better_sqlite3
       build_web
       ;;
     start)
+      detect_node
       start_server_bg
       ;;
     systemd)
+      detect_node
       install_systemd_service
       ;;
     nginx)
@@ -163,9 +197,9 @@ main() {
     all)
       install_system_deps
       install_node_20_if_missing
-      need_cmd node
-      need_cmd npm
+      detect_node
       install_deps
+      ensure_better_sqlite3
       build_web
       start_server_bg
       install_systemd_service

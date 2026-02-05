@@ -7,6 +7,7 @@ WEB_DIR="$PROJECT_DIR/web"
 
 API_PORT="${API_PORT:-3001}"
 HOST="${HOST:-0.0.0.0}"
+PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"
 
 PID_FILE="$PROJECT_DIR/.server.pid"
 LOG_FILE="$PROJECT_DIR/.server.log"
@@ -19,6 +20,15 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 || { err "缺少命令：$1"; exit 1; }
 }
 
+detect_node() {
+  NODE_BIN="$(command -v node)"
+  NPM_BIN="$(command -v npm)"
+  if [[ -z "${NODE_BIN:-}" || -z "${NPM_BIN:-}" ]]; then
+    err "未检测到 node/npm，请先安装 Node.js。"
+    exit 1
+  fi
+}
+
 check_layout() {
   if [[ ! -d "$SERVER_DIR" || ! -d "$WEB_DIR" ]]; then
     err "目录结构不完整：需要存在 server/ 和 web/ 目录。"
@@ -27,12 +37,27 @@ check_layout() {
   fi
 }
 
+ensure_better_sqlite3() {
+  local binding
+  binding="$(find "$SERVER_DIR/node_modules/better-sqlite3" -name "better_sqlite3.node" 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$binding" ]]; then
+    return 0
+  fi
+  log "检测到 better-sqlite3 未编译，尝试从源码构建..."
+  (cd "$SERVER_DIR" && env npm_config_python="$PYTHON_BIN" "$NPM_BIN" rebuild better-sqlite3 --build-from-source --verbose)
+  binding="$(find "$SERVER_DIR/node_modules/better-sqlite3" -name "better_sqlite3.node" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$binding" ]]; then
+    warn "better-sqlite3 仍未生成本地绑定，请检查编译日志或系统依赖。"
+  fi
+}
+
 install_deps() {
   log "安装后端依赖（production）..."
-  (cd "$SERVER_DIR" && npm install --omit=dev)
+  (cd "$SERVER_DIR" && "$NPM_BIN" install --omit=dev)
+  ensure_better_sqlite3
 
   log "安装前端依赖..."
-  (cd "$WEB_DIR" && npm install --no-audit --no-fund --loglevel=info)
+  (cd "$WEB_DIR" && "$NPM_BIN" install --no-audit --no-fund --loglevel=info)
 }
 
 build_web() {
@@ -42,7 +67,7 @@ VITE_API_BASE=.
 EOF
 
   log "构建前端..."
-  (cd "$WEB_DIR" && npm run build)
+  (cd "$WEB_DIR" && "$NPM_BIN" run build)
 }
 
 start_server() {
@@ -56,7 +81,7 @@ start_server() {
   fi
 
   log "启动后端（HOST=$HOST PORT=$API_PORT）..."
-  (cd "$SERVER_DIR" && nohup env HOST="$HOST" PORT="$API_PORT" node src/index.js > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE")
+  (cd "$SERVER_DIR" && nohup env HOST="$HOST" PORT="$API_PORT" "$NODE_BIN" src/index.js > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE")
   sleep 1
   log "后端已尝试启动。日志：$LOG_FILE"
 }
@@ -98,8 +123,7 @@ EOF
 
 main() {
   check_layout
-  need_cmd node
-  need_cmd npm
+  detect_node
 
   local cmd="${1:-}"
   case "$cmd" in
