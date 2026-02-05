@@ -129,7 +129,7 @@ export default function DayCheckin() {
               />
             </div>
             <div>
-              <label>运动分钟数（≥25）</label>
+              <label>运动分钟数（≥20）</label>
               <input
                 className="input"
                 type="number"

@@ -45,7 +45,7 @@ export default function StudentDashboard() {
       { label: `笔记 ${notesCount} 条`, ok: notesCount >= 1 },
       {
         label: `运动 ${r.exercise_minutes} 分钟`,
-        ok: r.exercise_minutes >= 25,
+        ok: r.exercise_minutes >= 20,
       },
     ];
   }, [data]);

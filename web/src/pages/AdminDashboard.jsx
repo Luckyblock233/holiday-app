@@ -60,7 +60,7 @@ export default function AdminDashboard() {
         r.screen_minutes <= 90,
         !!r.homework_done,
         r.reading_minutes >= 30,
-        r.exercise_minutes >= 25,
+        r.exercise_minutes >= 20,
         (data?.notesCount || 0) >= 1,
       ]
     : [];
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
                 </div>
                 <div
                   className={
-                    "badge " + (r.exercise_minutes >= 25 ? "good" : "danger")
+                    "badge " + (r.exercise_minutes >= 20 ? "good" : "danger")
                   }
                 >
                   运动：{r.exercise_minutes} 分钟
