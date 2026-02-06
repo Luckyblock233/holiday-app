@@ -5,7 +5,8 @@ import path from "path";
 import crypto from "crypto";
 import sharp from "sharp";
 import { db } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authRequired, requireRole } from "../auth.js";
+import { getChinaDateISO } from "../time.js";
 
 const router = express.Router();
 
@@ -65,6 +66,49 @@ async function compressImage(filePath, mime) {
   fs.renameSync(`${filePath}.tmp`, filePath);
 }
 
+router.post(
+  "/game-library",
+  authRequired,
+  requireRole("admin"),
+  upload.single("file"),
+  async (req, res) => {
+    const uid = req.user.uid;
+    const day = getChinaDateISO();
+    if (!req.file) return res.status(400).json({ error: "No file" });
+
+    try {
+      await compressImage(req.file.path, req.file.mimetype);
+    } catch (e) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        // ignore
+      }
+      return res.status(400).json({ error: "Invalid image" });
+    }
+
+    const finalSize = fs.existsSync(req.file.path)
+      ? fs.statSync(req.file.path).size
+      : req.file.size;
+
+    db.prepare(
+      `
+      INSERT INTO uploads(user_id, day, category, filename, mime, size)
+      VALUES(?,?,?,?,?,?)
+    `
+    ).run(
+      uid,
+      day,
+      "game_library",
+      req.file.filename,
+      req.file.mimetype,
+      finalSize
+    );
+
+    res.json({ ok: true, fileUrl: `/api/uploads/file/${req.file.filename}` });
+  }
+);
+
 router.post("/:day", authRequired, upload.single("file"), async (req, res) => {
   const uid = req.user.uid;
   const { day } = req.params;
@@ -111,10 +155,15 @@ router.get("/file/:filename", authRequired, (req, res) => {
 
   let mime = null;
   const uploadRow = db
-    .prepare("SELECT user_id, mime FROM uploads WHERE filename=?")
+    .prepare("SELECT user_id, mime, category FROM uploads WHERE filename=?")
     .get(filename);
   if (uploadRow) {
-    if (req.user.role !== "admin" && uploadRow.user_id !== req.user.uid) {
+    const isGameLibrary = uploadRow.category === "game_library";
+    if (
+      !isGameLibrary &&
+      req.user.role !== "admin" &&
+      uploadRow.user_id !== req.user.uid
+    ) {
       return res.status(404).end();
     }
     mime = uploadRow.mime || null;

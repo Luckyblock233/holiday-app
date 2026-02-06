@@ -112,4 +112,19 @@ export const api = {
       method: "POST",
       body: { minutes, note, day },
     }),
+
+  games: () => request(`/api/games`),
+  adminGames: () => request(`/api/admin/games`),
+  adminCreateGame: (payload) =>
+    request(`/api/admin/games`, { method: "POST", body: payload }),
+  adminUpdateGame: (id, payload) =>
+    request(`/api/admin/games/${id}`, { method: "PUT", body: payload }),
+  adminDeleteGame: (id) =>
+    request(`/api/admin/games/${id}`, { method: "DELETE" }),
+  adminUploadGameImage: (formData) =>
+    request(`/api/uploads/game-library`, {
+      method: "POST",
+      body: formData,
+      isForm: true,
+    }),
 };

@@ -14,25 +14,40 @@ export default function AdminDashboard() {
   const [uploadsByCategory, setUploadsByCategory] = useState({});
   const [uploadsPage, setUploadsPage] = useState(1);
   const [uploadsTotal, setUploadsTotal] = useState(0);
+  const [games, setGames] = useState([]);
+  const [gameErr, setGameErr] = useState("");
+  const [gameUploading, setGameUploading] = useState({});
+  const [newGameUploading, setNewGameUploading] = useState(false);
   const uploadsPageSize = 9;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [adjustMinutes, setAdjustMinutes] = useState(10);
   const [adjustType, setAdjustType] = useState("add");
   const [adjustNote, setAdjustNote] = useState("");
+  const [newGame, setNewGame] = useState({
+    title: "",
+    description: "",
+    linkUrl: "",
+    linkLabel: "",
+    images: [""],
+    sortOrder: 0,
+  });
 
   async function load() {
     try {
       setErr("");
-      const [d, b, u] = await Promise.all([
+      const [d, b, u, g] = await Promise.all([
         api.adminGetDay(day),
         api.myBalance(),
         api.adminUploads(day, { page: uploadsPage, pageSize: uploadsPageSize }),
+        api.adminGames(),
       ]);
       setData(d);
       setBalance(b.balance);
       setUploadsByCategory(u.categories || {});
       setUploadsTotal(u.total || 0);
+      setGames(g.items || []);
+      setGameErr("");
     } catch (e) {
       setErr(e.message);
     }
@@ -69,6 +84,89 @@ export default function AdminDashboard() {
         (completionItems.filter(Boolean).length / completionItems.length) * 100
       )
     : 0;
+
+  function updateGame(id, patch) {
+    setGames((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, ...patch } : g))
+    );
+  }
+
+  function updateGameImage(id, idx, value) {
+    setGames((prev) =>
+      prev.map((g) => {
+        if (g.id !== id) return g;
+        const images = Array.isArray(g.images) ? [...g.images] : [];
+        images[idx] = value;
+        return { ...g, images };
+      })
+    );
+  }
+
+  function addGameImage(id) {
+    setGames((prev) =>
+      prev.map((g) => {
+        if (g.id !== id) return g;
+        const images = Array.isArray(g.images) ? [...g.images] : [];
+        images.push("");
+        return { ...g, images };
+      })
+    );
+  }
+
+  function removeGameImage(id, idx) {
+    setGames((prev) =>
+      prev.map((g) => {
+        if (g.id !== id) return g;
+        const images = Array.isArray(g.images) ? [...g.images] : [];
+        images.splice(idx, 1);
+        return { ...g, images };
+      })
+    );
+  }
+
+  async function uploadGameImages(files, { onSuccess, onDone, onError }) {
+    const list = Array.from(files || []).filter(Boolean);
+    if (list.length === 0) return;
+    try {
+      setGameErr("");
+      const urls = [];
+      for (const file of list) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await api.adminUploadGameImage(formData);
+        if (res?.fileUrl) urls.push(res.fileUrl);
+      }
+      if (urls.length) onSuccess(urls);
+    } catch (e) {
+      if (onError) onError(e);
+      else setGameErr(e.message);
+    } finally {
+      if (onDone) onDone();
+    }
+  }
+
+  function renderThumb(url, key) {
+    const isExternal = /^https?:\/\//i.test(url || "");
+    if (isExternal) {
+      return (
+        <img
+          key={key}
+          className="h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200"
+          src={url}
+          alt=""
+          loading="lazy"
+        />
+      );
+    }
+    return (
+      <SecureImage
+        key={key}
+        className="h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200"
+        src={url}
+        alt=""
+      />
+    );
+  }
 
   return (
     <div className="container py-6">
@@ -270,6 +368,366 @@ export default function AdminDashboard() {
           >
             确认调整
           </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="h1">游戏库管理</div>
+        <div className="muted">新增、编辑或删除学生端展示的游戏条目</div>
+        {gameErr && <div className="mt-2 badge danger">{gameErr}</div>}
+
+        <div className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4">
+          <div className="text-sm font-semibold text-slate-900">新增条目</div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label>标题</label>
+              <input
+                className="input"
+                value={newGame.title}
+                onChange={(e) =>
+                  setNewGame((g) => ({ ...g, title: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label>排序（小到大）</label>
+              <input
+                className="input"
+                type="number"
+                value={newGame.sortOrder}
+                onChange={(e) =>
+                  setNewGame((g) => ({
+                    ...g,
+                    sortOrder: Number(e.target.value || 0),
+                  }))
+                }
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label>说明文字</label>
+              <textarea
+                className="input"
+                rows={3}
+                value={newGame.description}
+                onChange={(e) =>
+                  setNewGame((g) => ({ ...g, description: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label>链接标题</label>
+              <input
+                className="input"
+                value={newGame.linkLabel}
+                onChange={(e) =>
+                  setNewGame((g) => ({ ...g, linkLabel: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label>链接地址</label>
+              <input
+                className="input"
+                value={newGame.linkUrl}
+                onChange={(e) =>
+                  setNewGame((g) => ({ ...g, linkUrl: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <div className="text-sm font-semibold text-slate-900">图片地址</div>
+            <div className="mt-2 space-y-2">
+              {newGame.images.map((url, idx) => (
+                <div key={`new_${idx}`} className="flex gap-2">
+                  <input
+                    className="input flex-1"
+                    placeholder="https://example.com/image.jpg"
+                    value={url}
+                    onChange={(e) =>
+                      setNewGame((g) => {
+                        const images = [...g.images];
+                        images[idx] = e.target.value;
+                        return { ...g, images };
+                      })
+                    }
+                  />
+                  <button
+                    className="btn secondary"
+                    type="button"
+                    onClick={() =>
+                      setNewGame((g) => {
+                        const images = [...g.images];
+                        images.splice(idx, 1);
+                        return { ...g, images: images.length ? images : [""] };
+                      })
+                    }
+                  >
+                    删除
+                  </button>
+                </div>
+              ))}
+            </div>
+            {newGame.images.filter(Boolean).length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {newGame.images
+                  .filter(Boolean)
+                  .map((url, idx) => renderThumb(url, `new_thumb_${idx}`))}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() =>
+                  setNewGame((g) => ({ ...g, images: [...g.images, ""] }))
+                }
+              >
+                添加图片地址
+              </button>
+              <label className="btn secondary cursor-pointer">
+                {newGameUploading ? "上传中..." : "上传图片"}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  disabled={newGameUploading}
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    e.target.value = "";
+                    if (!files || files.length === 0) return;
+                    setNewGameUploading(true);
+                    uploadGameImages(files, {
+                      onSuccess: (urls) =>
+                        setNewGame((g) => ({
+                          ...g,
+                          images: [...g.images.filter(Boolean), ...urls],
+                        })),
+                      onDone: () => setNewGameUploading(false),
+                    });
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <button
+              className="btn w-full sm:w-auto"
+              onClick={async () => {
+                try {
+                  setGameErr("");
+                  const payload = {
+                    title: newGame.title.trim(),
+                    description: newGame.description.trim(),
+                    linkUrl: newGame.linkUrl.trim(),
+                    linkLabel: newGame.linkLabel.trim(),
+                    images: newGame.images.map((i) => i.trim()).filter(Boolean),
+                    sortOrder: Number(newGame.sortOrder || 0),
+                  };
+                  await api.adminCreateGame(payload);
+                  setNewGame({
+                    title: "",
+                    description: "",
+                    linkUrl: "",
+                    linkLabel: "",
+                    images: [""],
+                    sortOrder: 0,
+                  });
+                  await load();
+                } catch (e) {
+                  setGameErr(e.message);
+                }
+              }}
+            >
+              新增条目
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {games.length === 0 && <div className="muted">暂无游戏条目</div>}
+          {games.map((game) => (
+            <div
+              key={game.id}
+              className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-soft"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label>标题</label>
+                  <input
+                    className="input"
+                    value={game.title}
+                    onChange={(e) => updateGame(game.id, { title: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>排序（小到大）</label>
+                  <input
+                    className="input"
+                    type="number"
+                    value={game.sortOrder ?? 0}
+                    onChange={(e) =>
+                      updateGame(game.id, { sortOrder: Number(e.target.value || 0) })
+                    }
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label>说明文字</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={game.description || ""}
+                    onChange={(e) =>
+                      updateGame(game.id, { description: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label>链接标题</label>
+                  <input
+                    className="input"
+                    value={game.linkLabel || ""}
+                    onChange={(e) =>
+                      updateGame(game.id, { linkLabel: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label>链接地址</label>
+                  <input
+                    className="input"
+                    value={game.linkUrl || ""}
+                    onChange={(e) =>
+                      updateGame(game.id, { linkUrl: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <div className="text-sm font-semibold text-slate-900">图片地址</div>
+                <div className="mt-2 space-y-2">
+                  {(game.images || []).map((url, idx) => (
+                    <div key={`${game.id}_${idx}`} className="flex gap-2">
+                      <input
+                        className="input flex-1"
+                        placeholder="https://example.com/image.jpg"
+                        value={url}
+                        onChange={(e) =>
+                          updateGameImage(game.id, idx, e.target.value)
+                        }
+                      />
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() => removeGameImage(game.id, idx)}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {(game.images || []).filter(Boolean).length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(game.images || [])
+                      .filter(Boolean)
+                      .map((url, idx) =>
+                        renderThumb(url, `${game.id}_thumb_${idx}`)
+                      )}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    className="btn secondary"
+                    type="button"
+                    onClick={() => addGameImage(game.id)}
+                  >
+                    添加图片地址
+                  </button>
+                  <label className="btn secondary cursor-pointer">
+                    {gameUploading[game.id] ? "上传中..." : "上传图片"}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/png,image/jpeg,image/webp"
+                      multiple
+                      disabled={!!gameUploading[game.id]}
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        e.target.value = "";
+                        if (!files || files.length === 0) return;
+                        setGameUploading((prev) => ({
+                          ...prev,
+                          [game.id]: true,
+                        }));
+                        uploadGameImages(files, {
+                          onSuccess: (urls) =>
+                            setGames((prev) =>
+                              prev.map((g) =>
+                                g.id === game.id
+                                  ? {
+                                      ...g,
+                                      images: [...(g.images || []), ...urls],
+                                    }
+                                  : g
+                              )
+                            ),
+                          onDone: () =>
+                            setGameUploading((prev) => ({
+                              ...prev,
+                              [game.id]: false,
+                            })),
+                        });
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className="btn"
+                  onClick={async () => {
+                    try {
+                      setGameErr("");
+                      const payload = {
+                        title: String(game.title || "").trim(),
+                        description: String(game.description || "").trim(),
+                        linkUrl: String(game.linkUrl || "").trim(),
+                        linkLabel: String(game.linkLabel || "").trim(),
+                        images: (game.images || []).map((i) => i.trim()).filter(Boolean),
+                        sortOrder: Number(game.sortOrder || 0),
+                      };
+                      await api.adminUpdateGame(game.id, payload);
+                      await load();
+                    } catch (e) {
+                      setGameErr(e.message);
+                    }
+                  }}
+                >
+                  保存修改
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={async () => {
+                    if (!window.confirm("确定要删除这条游戏条目吗？")) return;
+                    try {
+                      setGameErr("");
+                      await api.adminDeleteGame(game.id);
+                      await load();
+                    } catch (e) {
+                      setGameErr(e.message);
+                    }
+                  }}
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import SecureImage from "../components/SecureImage.jsx";
 import { getLocalDateISO } from "../date";
 
 function todayISO() {
@@ -10,15 +11,20 @@ export default function StudentDashboard() {
   const [day, setDay] = useState(todayISO());
   const [data, setData] = useState(null);
   const [balance, setBalance] = useState(0);
+  const [games, setGames] = useState([]);
   const [err, setErr] = useState("");
 
   async function load() {
     setErr("");
     try {
-      const d = await api.getDay(day);
-      const b = await api.myBalance();
+      const [d, b, g] = await Promise.all([
+        api.getDay(day),
+        api.myBalance(),
+        api.games(),
+      ]);
       setData(d);
       setBalance(b.balance);
+      setGames(g.items || []);
     } catch (e) {
       setErr(e.message);
     }
@@ -146,6 +152,63 @@ export default function StudentDashboard() {
         </div>
         <div className="muted mt-2">
           当前逻辑：基础奖励不要求家长检查；超额奖励需要家长检查
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="h1">当前可以游玩的游戏库</div>
+        {games.length === 0 && <div className="muted mt-2">暂无内容</div>}
+        <div className="mt-3 space-y-4">
+          {games.map((game) => (
+            <div key={game.id} className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-soft">
+              <div className="text-lg font-semibold text-slate-900">
+                {game.title}
+              </div>
+              {game.description && (
+                <div className="mt-1 text-sm text-slate-700 whitespace-pre-line">
+                  {game.description}
+                </div>
+              )}
+              {game.images?.length > 0 && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {game.images.map((url, idx) => {
+                    const isExternal = /^https?:\/\//i.test(url || "");
+                    if (isExternal) {
+                      return (
+                        <img
+                          key={`${game.id}_${idx}`}
+                          className="h-32 w-full rounded-xl object-cover"
+                          src={url}
+                          alt={game.title}
+                          loading="lazy"
+                        />
+                      );
+                    }
+                    return (
+                      <SecureImage
+                        key={`${game.id}_${idx}`}
+                        className="h-32 w-full rounded-xl object-cover"
+                        src={url}
+                        alt={game.title}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {game.linkUrl && (
+                <div className="mt-3">
+                  <a
+                    className="btn secondary w-full justify-center sm:w-auto"
+                    href={game.linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {game.linkLabel || "打开链接"}
+                  </a>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

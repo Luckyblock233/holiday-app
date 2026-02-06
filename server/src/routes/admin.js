@@ -157,4 +157,112 @@ router.post(
   }
 );
 
+function parseImages(value) {
+  let list = [];
+  if (Array.isArray(value)) {
+    list = value;
+  } else if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) list = parsed;
+    } catch {
+      list = [];
+    }
+  }
+  return list
+    .map((v) => String(v || "").trim())
+    .filter((v) => v.length > 0)
+    .slice(0, 10);
+}
+
+router.get("/games", authRequired, requireRole("admin"), (req, res) => {
+  const rows = db
+    .prepare(
+      "SELECT id, title, description, link_url, link_label, images_json, sort_order FROM game_library ORDER BY sort_order ASC, id DESC"
+    )
+    .all();
+  const items = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    description: r.description || "",
+    linkUrl: r.link_url || "",
+    linkLabel: r.link_label || "",
+    images: parseImages(r.images_json || ""),
+    sortOrder: r.sort_order || 0,
+  }));
+  res.json({ items });
+});
+
+router.post("/games", authRequired, requireRole("admin"), (req, res) => {
+  const title = String(req.body?.title || "").trim();
+  if (!title) return res.status(400).json({ error: "Title required" });
+
+  const description = String(req.body?.description || "").trim();
+  const linkUrl = String(req.body?.linkUrl || "").trim();
+  const linkLabel = String(req.body?.linkLabel || "").trim();
+  const images = parseImages(req.body?.images);
+  const sortOrder = Number.isFinite(Number(req.body?.sortOrder))
+    ? Number(req.body?.sortOrder)
+    : 0;
+
+  const result = db
+    .prepare(
+      `
+      INSERT INTO game_library(title, description, link_url, link_label, images_json, sort_order, updated_at)
+      VALUES(?,?,?,?,?,?,datetime('now'))
+    `
+    )
+    .run(
+      title,
+      description,
+      linkUrl,
+      linkLabel,
+      JSON.stringify(images),
+      sortOrder
+    );
+
+  res.json({ ok: true, id: result.lastInsertRowid });
+});
+
+router.put("/games/:id", authRequired, requireRole("admin"), (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Bad id" });
+
+  const title = String(req.body?.title || "").trim();
+  if (!title) return res.status(400).json({ error: "Title required" });
+
+  const description = String(req.body?.description || "").trim();
+  const linkUrl = String(req.body?.linkUrl || "").trim();
+  const linkLabel = String(req.body?.linkLabel || "").trim();
+  const images = parseImages(req.body?.images);
+  const sortOrder = Number.isFinite(Number(req.body?.sortOrder))
+    ? Number(req.body?.sortOrder)
+    : 0;
+
+  db.prepare(
+    `
+    UPDATE game_library
+    SET title=?, description=?, link_url=?, link_label=?, images_json=?, sort_order=?, updated_at=datetime('now')
+    WHERE id=?
+  `
+  ).run(
+    title,
+    description,
+    linkUrl,
+    linkLabel,
+    JSON.stringify(images),
+    sortOrder,
+    id
+  );
+
+  res.json({ ok: true });
+});
+
+router.delete("/games/:id", authRequired, requireRole("admin"), (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Bad id" });
+  db.prepare("DELETE FROM game_library WHERE id=?").run(id);
+  res.json({ ok: true });
+});
+
 export default router;

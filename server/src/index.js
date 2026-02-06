@@ -10,6 +10,7 @@ import dayRoutes from "./routes/days.js";
 import uploadRoutes from "./routes/uploads.js";
 import redeemRoutes from "./routes/redemption.js";
 import adminRoutes from "./routes/admin.js";
+import gameRoutes from "./routes/games.js";
 
 initDb();
 
@@ -23,6 +24,7 @@ app.use("/api/days", dayRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/redeem", redeemRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/games", gameRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
